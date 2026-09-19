@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f6fb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="今日课表" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>今日课表</title>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="topbar-copy">
+        <div class="eyebrow" id="semesterLabel">加载中…</div>
+        <h1 id="headline">今天</h1>
+      </div>
+      <button class="today-button" id="todayBtn" type="button" aria-label="回到今天">今</button>
+    </header>
+
+    <section class="date-toolbar" aria-label="日期选择">
+      <button class="week-arrow" id="prevWeekBtn" type="button" aria-label="上一周">‹</button>
+      <div class="date-strip" id="dateStrip"></div>
+      <button class="week-arrow" id="nextWeekBtn" type="button" aria-label="下一周">›</button>
+    </section>
+
+    <section id="todayView" class="view active">
+      <div class="date-summary">
+        <div>
+          <div class="date-title" id="dateTitle"></div>
+          <div class="date-subtitle" id="dateSubtitle"></div>
+        </div>
+        <button class="plain-btn" id="pickDateBtn" type="button">选日期</button>
+        <input id="datePicker" type="date" hidden />
+      </div>
+
+      <section class="hero-card" id="heroCard" aria-live="polite"></section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <h2>当天课程</h2>
+          <span id="courseCount"></span>
+        </div>
+        <div id="courseList" class="course-list"></div>
+      </section>
+
+      <button class="next-day-card" id="nextDayCard" type="button"></button>
+    </section>
+
+    <section id="weekView" class="view">
+      <div class="week-title-row">
+        <div>
+          <h2>本周课表</h2>
+          <p id="weekRange"></p>
+        </div>
+        <button class="plain-btn" id="weekTodayBtn" type="button">本周</button>
+      </div>
+      <div id="weekList" class="week-list"></div>
+    </section>
+
+    <section id="aboutView" class="view">
+      <div class="about-card">
+        <div class="about-icon">✓</div>
+        <h2>课表已就绪</h2>
+        <p>这一版直接读取远程课表数据。以后你更新 GitHub 上的数据，他重新打开就能拿到新版本；断网时继续使用最近一次缓存。</p>
+      </div>
+
+      <div class="info-list">
+        <div><span>学期</span><strong id="infoSemester">—</strong></div>
+        <div><span>第一周</span><strong id="infoStart">—</strong></div>
+        <div><span>数据更新时间</span><strong id="infoUpdated">—</strong></div>
+        <div><span>待核对项目</span><strong id="infoPending">—</strong></div>
+      </div>
+
+      <div class="notice-card">
+        <strong>下一步：教务导入</strong>
+        <p>正方教务适配器已经独立留位。确认实际接口后，只补导入器，不动手机界面和课表核心。</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="主导航">
+    <button class="nav-item active" data-view="todayView" type="button"><span class="nav-glyph">●</span><span>今天</span></button>
+    <button class="nav-item" data-view="weekView" type="button"><span class="nav-glyph">▦</span><span>本周</span></button>
+    <button class="nav-item" data-view="aboutView" type="button"><span class="nav-glyph">···</span><span>更多</span></button>
+  </nav>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

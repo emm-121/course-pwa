@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "semester": {
+    "id": "2026-2027-1",
+    "label": "2026–2027 · 第一学期",
+    "firstWeekMonday": "2026-08-31",
+    "weekCount": 18,
+    "timezone": "Asia/Shanghai"
+  },
+  "periods": [
+    {"index": 1, "start": "08:00", "end": "08:50", "verified": true},
+    {"index": 2, "start": "09:00", "end": "09:50", "verified": true},
+    {"index": 3, "start": "10:10", "end": "11:00", "verified": true},
+    {"index": 4, "start": "11:10", "end": "12:00", "verified": true},
+    {"index": 5, "start": "14:10", "end": "15:00", "verified": true},
+    {"index": 6, "start": "15:10", "end": "16:00", "verified": true},
+    {"index": 7, "start": "16:10", "end": "17:00", "verified": true},
+    {"index": 8, "start": "17:10", "end": "18:00", "verified": true},
+    {"index": 9, "start": "19:00", "end": "19:50", "verified": true},
+    {"index": 10, "start": null, "end": null, "verified": false}
+  ]
+}
