@@ -38,6 +38,8 @@
         <input id="datePicker" type="date" hidden />
       </div>
 
+      <div class="holiday-banner" id="holidayBanner" hidden></div>
+
       <section class="hero-card" id="heroCard" aria-live="polite"></section>
 
       <section class="section-block">
@@ -76,9 +78,24 @@
         <div><span>待核对项目</span><strong id="infoPending">—</strong></div>
       </div>
 
+      <a class="notice-card notice-link" href="./import.html">
+        <strong>课表导入助手 →</strong>
+        <p>接收正方快捷指令或 WakeUp/Sleepy JSON，检查后生成可直接上传到 GitHub 的 schedule.json。</p>
+      </a>
+
+      <a class="notice-card notice-link" href="./shortcut-setup.html">
+        <strong>正方快捷指令准备 / 自测 →</strong>
+        <p>先用内置模拟课表验证 Safari 导出流程，再让朋友在真实教务页面跑一次。</p>
+      </a>
+
+      <a class="notice-card notice-link" href="./manage.html">
+        <strong>调课 / 停课维护 →</strong>
+        <p>不用手改 JSON：生成全天停课、跨周补课、按星期上课等 exceptions.json。</p>
+      </a>
+
       <div class="notice-card">
-        <strong>下一步：教务导入</strong>
-        <p>正方教务适配器已经独立留位。确认实际接口后，只补导入器，不动手机界面和课表核心。</p>
+        <strong>正方导入状态</strong>
+        <p>已完成通用新版正方 DOM 解析器，并提供 WakeUp/Sleepy JSON 作为备用导入路径。真实教务页面仍需最后一次验证；失败时只需要诊断 JSON，不需要继续逐张截图。</p>
       </div>
     </section>
   </main>

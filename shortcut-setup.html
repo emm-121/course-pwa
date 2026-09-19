@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="stylesheet" href="./styles.css"><title>正方导出快捷指令</title></head>
+<body><main class="app-shell import-shell">
+<header class="topbar"><div class="topbar-copy"><div class="eyebrow">维护工具</div><h1>快捷指令准备</h1></div><a class="today-button import-close" href="./">×</a></header>
+<section class="import-card"><span class="import-step">1</span><div><h2>先在自己的 iPhone 配一次</h2><p>新建快捷指令，接收“Safari 网页”，添加“在网页上运行 JavaScript”，把下面脚本粘进去；下一步接“拷贝到剪贴板”。</p></div></section>
+<section class="import-panel"><button id="copy" class="import-primary" type="button">复制正方导出脚本</button><p id="copyState" style="font-size:11px;color:var(--muted);line-height:1.6"></p></section>
+<section class="import-card"><span class="import-step">2</span><div><h2>不找朋友也能先测</h2><p>用 Safari 打开测试课表页，然后分享 → 运行刚建好的快捷指令。正常应复制出包含“高等数学（一）”和“大学英语”的 JSON。</p></div></section>
+<a class="notice-card notice-link" href="./tools/zhengfang-fixture.html"><strong>打开正方模拟课表 →</strong><p>这是本项目自带的测试页面，不含真实个人信息。</p></a>
+</main><script>
+document.getElementById('copy').onclick=async()=>{try{const t=await fetch('./tools/zhengfang-shortcut.js',{cache:'no-store'}).then(r=>r.text());await navigator.clipboard.writeText(t);document.getElementById('copyState').textContent='已复制。现在到“快捷指令”App 粘贴即可。';}catch(e){document.getElementById('copyState').textContent='浏览器未允许自动复制，请打开 tools/zhengfang-shortcut.js 手动全选复制。';}};
+</script></body></html>

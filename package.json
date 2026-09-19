@@ -2,5 +2,7 @@
   "name": "course-pwa",
   "private": true,
   "type": "module",
-  "scripts": {"test": "node tests/core.mjs"}
+  "scripts": {
+    "test": "node tests/core.mjs && node tests/importer.mjs"
+  }
 }

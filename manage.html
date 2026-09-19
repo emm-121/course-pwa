@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f6fb" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>调课维护</title>
+</head>
+<body>
+<main class="app-shell import-shell">
+  <header class="topbar">
+    <div class="topbar-copy"><div class="eyebrow">维护工具</div><h1>调课 / 停课</h1></div>
+    <a class="today-button import-close" href="./" aria-label="返回">×</a>
+  </header>
+
+  <section class="import-card">
+    <span class="import-step">1</span>
+    <div><h2>添加学校实际教学变动</h2><p>国家节假日不会自动删课。收到学校通知后，在这里生成准确的 <code>exceptions.json</code>。</p></div>
+  </section>
+
+  <section class="import-panel manage-form">
+    <label>日期<input id="date" type="date" /></label>
+    <label>规则<select id="action">
+      <option value="dayOff">全天停课</option>
+      <option value="useDate">按另一个具体日期的课上（推荐用于跨周调休）</option>
+      <option value="useWeekday">按本周某星期的课上</option>
+      <option value="cancel">取消某一节课</option>
+      <option value="modify">修改某一节课</option>
+      <option value="add">临时增加一节课</option>
+    </select></label>
+
+    <div id="useDateFields" class="conditional" hidden><label>来源日期<input id="sourceDate" type="date" /></label><small>例如：把 10 月 7 日原有的课程整体挪到 9 月 28 日，就在目标日期 9/28 添加 useDate，来源日期填 10/7。</small></div>
+    <div id="weekdayFields" class="conditional" hidden><label>按星期<select id="weekday"><option value="1">周一</option><option value="2">周二</option><option value="3">周三</option><option value="4">周四</option><option value="5">周五</option><option value="6">周六</option><option value="7">周日</option></select></label></div>
+    <div id="meetingFields" class="conditional" hidden><label>课程<select id="meeting"></select></label></div>
+    <div id="modifyFields" class="conditional" hidden>
+      <label>新教室（不改可留空）<input id="newLocation" type="text" placeholder="例如 新城校区 · 4201" /></label>
+      <label>新教师（不改可留空）<input id="newTeacher" type="text" /></label>
+      <div class="two-col"><label>新开始节<input id="newStart" type="number" min="1" max="20" /></label><label>新结束节<input id="newEnd" type="number" min="1" max="20" /></label></div>
+    </div>
+    <div id="addFields" class="conditional" hidden>
+      <label>课程名<input id="addCourse" type="text" /></label>
+      <label>教室<input id="addLocation" type="text" /></label>
+      <label>教师<input id="addTeacher" type="text" /></label>
+      <div class="two-col"><label>开始节<input id="addStart" type="number" min="1" max="20" /></label><label>结束节<input id="addEnd" type="number" min="1" max="20" /></label></div>
+    </div>
+    <label>备注（可选）<input id="note" type="text" placeholder="例如 2026 年国庆调课通知" /></label>
+    <button id="addRule" class="import-primary" type="button">加入规则</button>
+  </section>
+
+  <section class="import-card">
+    <span class="import-step">2</span>
+    <div><h2>当前规则</h2><p id="ruleSummary">正在读取…</p></div>
+  </section>
+  <section id="ruleList" class="manage-list"></section>
+  <button id="download" class="import-primary manage-download" type="button">下载 exceptions.json</button>
+
+  <section class="import-card muted-card">
+    <span class="import-step">!</span>
+    <div><h2>为什么有“按具体日期”</h2><p>学校调休可能跨周。只写“按周二上课”会错误套用目标日期所在周的单双周规则；按具体日期复制可以保留来源日期真实周次。</p></div>
+  </section>
+</main>
+<script type="module">
+import {meetingsForDate} from './core.js';
+
+const $ = id => document.getElementById(id);
+let semesterData, scheduleData, rules = [];
+const action = $('action'), date = $('date');
+
+boot();
+async function boot() {
+  [semesterData, scheduleData, {exceptions: rules}] = await Promise.all([
+    fetch('./data/semester.json',{cache:'no-store'}).then(r=>r.json()),
+    fetch('./data/schedule.json',{cache:'no-store'}).then(r=>r.json()),
+    fetch('./data/exceptions.json',{cache:'no-store'}).then(r=>r.json())
+  ]);
+  rules = rules || [];
+  date.value = new Intl.DateTimeFormat('en-CA',{timeZone:semesterData.semester.timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  bind(); updateFields(); renderRules(); updateMeetings();
+}
+function bind() {
+  action.addEventListener('change', ()=>{updateFields();updateMeetings();});
+  date.addEventListener('change', updateMeetings);
+  $('addRule').addEventListener('click', addRule);
+  $('download').addEventListener('click', download);
+}
+function model() { return {semester:semesterData.semester, periods:semesterData.periods||[], timeProfiles:semesterData.timeProfiles||[], meetings:scheduleData.meetings||[], exceptions:rules}; }
+function updateFields() {
+  const a=action.value;
+  $('useDateFields').hidden=a!=='useDate';
+  $('weekdayFields').hidden=a!=='useWeekday';
+  $('meetingFields').hidden=!(a==='cancel'||a==='modify');
+  $('modifyFields').hidden=a!=='modify';
+  $('addFields').hidden=a!=='add';
+}
+function updateMeetings() {
+  if (!semesterData || !date.value) return;
+  const ms=meetingsForDate(date.value, model());
+  $('meeting').innerHTML=ms.length?ms.map(m=>`<option value="${escAttr(m.id)}">第${m.startPeriod}–${m.endPeriod}节 · ${esc(m.course)}</option>`).join(''):'<option value="">这一天没有可选课程</option>';
+}
+function addRule() {
+  if(!date.value) return alert('请选择日期');
+  const a=action.value; let rule={date:date.value,action:a};
+  if(a==='useDate') { if(!$('sourceDate').value) return alert('请选择来源日期'); rule.sourceDate=$('sourceDate').value; }
+  if(a==='useWeekday') rule.weekday=Number($('weekday').value);
+  if(a==='cancel'||a==='modify') { if(!$('meeting').value) return alert('请选择课程'); rule.meetingId=$('meeting').value; }
+  if(a==='modify') {
+    const changes={}; if($('newLocation').value.trim()) changes.location=$('newLocation').value.trim(); if($('newTeacher').value.trim()) changes.teacher=$('newTeacher').value.trim();
+    if($('newStart').value) changes.startPeriod=Number($('newStart').value); if($('newEnd').value) changes.endPeriod=Number($('newEnd').value);
+    if(!Object.keys(changes).length) return alert('请至少填写一项修改'); rule.changes=changes;
+  }
+  if(a==='add') {
+    const course=$('addCourse').value.trim(), start=Number($('addStart').value), end=Number($('addEnd').value);
+    if(!course||!start||!end||end<start) return alert('请填写课程名和正确节次');
+    rule.meeting={id:`extra-${date.value}-${Date.now().toString(36)}`,course,teacher:$('addTeacher').value.trim(),location:$('addLocation').value.trim(),startPeriod:start,endPeriod:end,weeks:[],color:'#315efb'};
+  }
+  if($('note').value.trim()) rule.note=$('note').value.trim();
+  rules.push(rule); renderRules(); updateMeetings();
+}
+function renderRules() {
+  $('ruleSummary').textContent=rules.length?`共 ${rules.length} 条规则；下载后替换 GitHub 的 data/exceptions.json。`:'目前没有调课规则。';
+  $('ruleList').innerHTML=rules.length?rules.map((r,i)=>`<article class="manage-rule"><div><strong>${esc(r.date)} · ${esc(label(r))}</strong><small>${esc(detail(r))}</small></div><button type="button" data-i="${i}">删除</button></article>`).join(''):'<div class="empty-list"><strong>暂无规则</strong><span>学校发布放假/调课通知后再添加。</span></div>';
+  $('ruleList').querySelectorAll('button[data-i]').forEach(b=>b.onclick=()=>{rules.splice(Number(b.dataset.i),1);renderRules();updateMeetings();});
+}
+function label(r){return ({dayOff:'全天停课',useDate:'按具体日期课表',useWeekday:'按星期课表',cancel:'取消课程',modify:'修改课程',add:'临时加课'})[r.action]||r.action;}
+function detail(r){if(r.action==='useDate')return `来源：${r.sourceDate}`;if(r.action==='useWeekday')return `周${'一二三四五六日'[r.weekday-1]}`;if(r.meetingId)return `课程ID：${r.meetingId}${r.note?' · '+r.note:''}`;if(r.action==='add')return `${r.meeting?.course||''} 第${r.meeting?.startPeriod}–${r.meeting?.endPeriod}节`;return r.note||'';}
+function download(){const payload={schemaVersion:3,updatedAt:new Date().toISOString(),exceptions:rules};const blob=new Blob([JSON.stringify(payload,null,2)+'\n'],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='exceptions.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function esc(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+function escAttr(v=''){return esc(v);}
+</script>
+</body>
+</html>

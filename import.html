@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f4f6fb" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>课表导入助手</title>
+</head>
+<body>
+  <main class="app-shell import-shell">
+    <header class="topbar">
+      <div class="topbar-copy"><div class="eyebrow">维护工具</div><h1>课表导入</h1></div>
+      <a class="today-button import-close" href="./" aria-label="返回">×</a>
+    </header>
+
+    <section class="import-card">
+      <span class="import-step">1</span>
+      <div><h2>粘贴或选择导出结果</h2><p>支持“正方课表快捷指令”、WakeUp / Sleepy 兼容 JSON，也支持现有 <code>schedule.json</code>。</p></div>
+    </section>
+
+    <section class="import-panel">
+      <label class="file-btn">选择 JSON 文件<input id="fileInput" type="file" accept="application/json,.json,text/plain" hidden /></label>
+      <div class="import-or">或</div>
+      <textarea id="jsonInput" spellcheck="false" placeholder="把朋友发来的 JSON 文本粘贴到这里…"></textarea>
+      <button class="import-primary" id="checkBtn" type="button">检查课表</button>
+    </section>
+
+    <section id="result" class="import-result" hidden></section>
+
+    <section class="import-card muted-card">
+      <span class="import-step">?</span>
+      <div><h2>如果导出失败</h2><p>快捷指令会返回诊断 JSON。把那段 JSON 发回来即可，我们可以据此适配学校版本，不需要继续截整张课表。</p></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import {validateScheduleJson} from './importers/zhengfang.js';
+    import {looksLikeWakeUpJson, convertWakeUpJson} from './importers/wakeup.js';
+    import {findScheduleConflicts} from './core.js';
+    const input = document.getElementById('jsonInput');
+    const file = document.getElementById('fileInput');
+    const result = document.getElementById('result');
+    let current = null;
+
+    file.addEventListener('change', async () => {
+      const f = file.files?.[0]; if (!f) return;
+      input.value = await f.text(); check();
+    });
+    document.getElementById('checkBtn').addEventListener('click', check);
+
+    function check() {
+      result.hidden = false;
+      try {
+        let data = JSON.parse(input.value.trim());
+        if (data.ok === false && data.diagnostics) {
+          current = null;
+          result.innerHTML = `<div class="result-bad"><strong>这是诊断结果，不是课表文件</strong><p>${esc(data.message || '解析失败')}</p><small>把这段 JSON 原样发回来即可继续适配。</small></div>`;
+          return;
+        }
+        if (looksLikeWakeUpJson(data)) data = convertWakeUpJson(data);
+        const v = validateScheduleJson(data);
+        if (!v.ok) throw new Error(v.errors.slice(0,5).join('；'));
+        current = data;
+        const conflicts = findScheduleConflicts(data.meetings);
+        const courses = new Set(data.meetings.map(x => x.course));
+        const days = new Set(data.meetings.map(x => x.weekday));
+        result.innerHTML = `<div class="result-good"><strong>课表可以使用</strong><p>${data.meetings.length} 个上课安排 · ${courses.size} 门不同课程 · 覆盖 ${days.size} 个星期日</p>${conflicts.length ? `<p><b>⚠ 发现 ${conflicts.length} 组时间冲突</b>，请在下载前核对。第一组：${esc(conflicts[0].a.course)} ↔ ${esc(conflicts[0].b.course)}（${conflicts[0].weeks.join('、')}周）</p>` : '<p>未发现课程时间冲突。</p>'}<div class="result-actions"><button id="downloadBtn" class="import-primary" type="button">下载 schedule.json</button><button id="localBtn" class="import-secondary" type="button">仅在本机试用</button></div><small>正式使用时，把下载的文件替换 GitHub 仓库里的 <code>data/schedule.json</code>。</small></div>`;
+        document.getElementById('downloadBtn').onclick = download;
+        document.getElementById('localBtn').onclick = localPreview;
+      } catch (e) {
+        current = null;
+        result.innerHTML = `<div class="result-bad"><strong>没有通过检查</strong><p>${esc(e.message || String(e))}</p></div>`;
+      }
+    }
+    function download() {
+      const blob = new Blob([JSON.stringify(current,null,2)+'\n'], {type:'application/json'});
+      const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='schedule.json'; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    }
+    function localPreview() {
+      localStorage.setItem('coursePwaPreviewSchedule', JSON.stringify(current));
+      location.href='./?previewImport=1';
+    }
+    function esc(v='') {return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+  </script>
+</body>
+</html>

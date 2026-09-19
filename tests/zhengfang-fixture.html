@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><title>fixture</title>
+<select id="xnm"><option selected>2026-2027</option></select>
+<select id="xqm"><option selected>1</option></select>
+<table id="kbgrid_table_0"><tbody><tr>
+<td id="1-1"><div><span><font>高等数学（一）</font></span><p><span title="节/周"></span><font>(1-2节)1-16周</font></p><p><span title="上课地点"></span><font>新城校区 4102</font></p><p><span title="教师"></span><font>张老师</font></p></div></td>
+<td id="2-1"><div><span><font>大学英语</font></span><p><span title="节/周"></span><font>(3-4节)1-16周(单)</font></p><p><span title="上课地点"></span><font>5301</font></p><p><span title="教师"></span><font>李老师</font></p></div></td>
+</tr></tbody></table>
+<pre id="out"></pre>
+<script type="module">
+import {parseZhengfangDocument, buildScheduleJson} from '../importers/zhengfang.js';
+const p=parseZhengfangDocument(document,{host:'example.edu.cn',href:location.href,title:document.title});
+document.getElementById('out').textContent=JSON.stringify(p.ok?buildScheduleJson(p,new Date('2026-09-20T00:00:00Z')):p);
+</script>

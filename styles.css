@@ -300,3 +300,55 @@ h1 { margin: 4px 0 0; font-size: 30px; line-height: 1.08; letter-spacing: -.035e
   .date-pill { height: 52px; border-radius: 15px; }
   .course-card { grid-template-columns: 58px 4px minmax(0,1fr); gap: 10px; padding: 13px; }
 }
+
+/* v0.3 import helper */
+.import-shell { padding-bottom: 36px; }
+.import-close { text-decoration: none; font-size: 28px; font-weight: 420; color: var(--text); }
+.import-card { margin-top: 20px; padding: 17px; border-radius: 22px; background: var(--surface); display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 12px; box-shadow: 0 6px 24px rgba(30,37,55,.04); }
+.import-step { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; color: var(--accent); background: #eaf0ff; font-size: 13px; font-weight: 800; }
+.import-card h2 { margin: 1px 0 5px; font-size: 15px; }
+.import-card p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.import-card code, .import-result code { font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: .95em; }
+.muted-card { margin-top: 13px; box-shadow: none; background: rgba(255,255,255,.52); }
+.import-panel { margin-top: 13px; padding: 16px; border-radius: 22px; background: var(--surface); box-shadow: 0 6px 24px rgba(30,37,55,.04); }
+.file-btn, .import-primary, .import-secondary { min-height: 44px; border: 0; border-radius: 14px; padding: 0 15px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 760; cursor: pointer; }
+.file-btn, .import-primary { color: white; background: var(--accent); }
+.import-secondary { color: var(--accent); background: #eaf0ff; }
+.import-or { padding: 10px 0; text-align: center; color: var(--faint); font-size: 10px; }
+#jsonInput { width: 100%; min-height: 180px; resize: vertical; border: 1px solid var(--line); border-radius: 15px; padding: 13px; background: rgba(248,249,252,.8); color: var(--text); font: 11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; outline: none; }
+#jsonInput:focus { border-color: rgba(49,94,251,.3); box-shadow: 0 0 0 3px rgba(49,94,251,.07); }
+.import-panel .import-primary { width: 100%; margin-top: 12px; }
+.import-result { margin-top: 13px; }
+.result-good, .result-bad { padding: 17px; border-radius: 22px; font-size: 12px; line-height: 1.55; }
+.result-good { color: #176449; background: #e8f7f0; }
+.result-bad { color: #9b3b31; background: #fff0ed; }
+.result-good strong, .result-bad strong { display:block; margin-bottom:5px; font-size:14px; }
+.result-good p, .result-bad p { margin:0 0 8px; }
+.result-good small, .result-bad small { color: inherit; opacity:.75; }
+.result-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:12px 0 9px; }
+
+.notice-link { display:block; text-decoration:none; }
+
+/* v0.4 holiday / maintenance */
+.holiday-banner {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border-radius: 17px;
+  background: #fff4dc;
+  color: #7d5714;
+  border: 1px solid rgba(165,108,18,.08);
+  font-size: 11px;
+  line-height: 1.45;
+}
+.holiday-banner strong { display:block; font-size:12px; margin-bottom:3px; }
+.holiday-banner span { opacity:.82; }
+.manage-form label { display:block; color:var(--muted); font-size:11px; font-weight:650; margin-bottom:12px; }
+.manage-form input, .manage-form select { width:100%; min-height:44px; margin-top:6px; border:1px solid var(--line); border-radius:13px; padding:0 12px; background:#fff; color:var(--text); font:inherit; }
+.manage-form small { display:block; margin:-4px 0 12px; color:var(--muted); font-size:10px; line-height:1.5; }
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+.manage-list { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+.manage-rule { padding:14px 15px; border-radius:18px; background:var(--surface); display:flex; justify-content:space-between; gap:12px; align-items:center; }
+.manage-rule strong { display:block; font-size:12px; }
+.manage-rule small { display:block; margin-top:4px; color:var(--muted); font-size:10px; }
+.manage-rule button { border:0; border-radius:10px; padding:8px 10px; color:#a33; background:#fff0ed; font-size:10px; }
+.manage-download { width:100%; margin-top:12px; }

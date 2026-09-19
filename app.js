@@ -3,7 +3,8 @@ import {
   mondayOfISO,
   semesterWeek,
   zonedNow,
-  meetingTime,
+  meetingTimeForDate,
+  periodsForDate,
   meetingsForDate,
   dayStatus,
   nextMeetingAfter,
@@ -16,8 +17,10 @@ import {
 const state = {
   semester: null,
   periods: [],
+  timeProfiles: [],
   meetings: [],
   exceptions: [],
+  holidays: [],
   scheduleMeta: null,
   selectedDate: null,
   lastRefresh: 0
@@ -45,7 +48,7 @@ async function boot() {
 }
 
 function cacheEls() {
-  for (const id of ['semesterLabel','headline','dateStrip','dateTitle','dateSubtitle','courseList','courseCount','heroCard','nextDayCard','weekList','weekRange','datePicker','toast','infoSemester','infoStart','infoUpdated','infoPending']) {
+  for (const id of ['semesterLabel','headline','dateStrip','dateTitle','dateSubtitle','holidayBanner','courseList','courseCount','heroCard','nextDayCard','weekList','weekRange','datePicker','toast','infoSemester','infoStart','infoUpdated','infoPending']) {
     els[id] = document.getElementById(id);
   }
 }
@@ -85,19 +88,31 @@ function bindEvents() {
 
 async function refreshData(silent = true) {
   const inline = window.__COURSE_DATA__;
-  const [sem, sch, ex] = inline
-    ? [inline.semester, inline.schedule, inline.exceptions]
+  const [sem, sch, ex, hol] = inline
+    ? [inline.semester, inline.schedule, inline.exceptions, inline.holidays || {holidays:[]}]
     : await Promise.all([
         loadJson('./data/semester.json'),
         loadJson('./data/schedule.json'),
-        loadJson('./data/exceptions.json')
+        loadJson('./data/exceptions.json'),
+        loadJson('./data/holidays.json').catch(() => ({holidays:[]}))
       ]);
+
+  // 维护页允许临时把刚导入的 schedule.json 放进本机预览。
+  // 正式运行仍以 GitHub 上的远程数据为准；去掉 URL 参数后不会改变其他设备。
+  if (new URLSearchParams(location.search).get('previewImport') === '1') {
+    try {
+      const localPreview = JSON.parse(localStorage.getItem('coursePwaPreviewSchedule') || 'null');
+      if (localPreview?.meetings?.length) sch.meetings = localPreview.meetings, sch.updatedAt = localPreview.updatedAt || sch.updatedAt, sch.source = localPreview.source || sch.source;
+    } catch {}
+  }
 
   const oldUpdated = state.scheduleMeta?.updatedAt;
   state.semester = sem.semester;
-  state.periods = sem.periods;
+  state.periods = sem.periods || [];
+  state.timeProfiles = sem.timeProfiles || [];
   state.meetings = sch.meetings;
   state.exceptions = ex.exceptions || [];
+  state.holidays = hol.holidays || [];
   state.scheduleMeta = sch;
   state.lastRefresh = Date.now();
 
@@ -112,7 +127,7 @@ async function loadJson(url) {
 }
 
 function model() {
-  return {semester: state.semester, periods: state.periods, meetings: state.meetings, exceptions: state.exceptions};
+  return {semester: state.semester, periods: state.periods, timeProfiles: state.timeProfiles, meetings: state.meetings, exceptions: state.exceptions};
 }
 
 function render() {
@@ -156,9 +171,25 @@ function renderToday() {
   const periodsTotal = meetings.reduce((n, x) => n + (x.endPeriod - x.startPeriod + 1), 0);
   els.courseCount.textContent = meetings.length ? `${meetings.length} 门课 · ${periodsTotal} 节` : '无课程';
 
+  renderHolidayNotice();
   renderHero(meetings, isToday, schoolNow);
   renderCourseList(meetings, isToday, schoolNow);
   renderNextDay();
+}
+
+function renderHolidayNotice() {
+  const entries = state.holidays.filter(h => h.date === state.selectedDate);
+  const hasSchoolRule = state.exceptions.some(e => e.date === state.selectedDate);
+  if (!entries.length) {
+    els.holidayBanner.hidden = true;
+    els.holidayBanner.innerHTML = '';
+    return;
+  }
+  const h = entries[0];
+  const kind = h.kind === 'workday' ? '调休工作日' : '法定节假日';
+  const status = hasSchoolRule ? '已应用学校课表规则' : '学校教学安排尚未确认，当前不自动删课/补课';
+  els.holidayBanner.hidden = false;
+  els.holidayBanner.innerHTML = `<strong>${esc(h.name || kind)} · ${kind}</strong><span>${esc(status)}</span>`;
 }
 
 function renderHero(meetings, isToday, schoolNow) {
@@ -170,7 +201,7 @@ function renderHero(meetings, isToday, schoolNow) {
     els.heroCard.innerHTML = `<div class="hero-empty">
       <div class="hero-label">${isToday ? '今天' : '这一天'}</div>
       <h2 class="hero-name">没有课程</h2>
-      <div class="hero-meta">${next ? `下一次上课：${relativeDateLabel(next.date)} · ${displayStart(next.meeting)}` : '当前学期暂时没有后续课程'}</div>
+      <div class="hero-meta">${next ? `下一次上课：${relativeDateLabel(next.date)} · ${displayStart(next.meeting, next.date)}` : '当前学期暂时没有后续课程'}</div>
     </div>`;
     return;
   }
@@ -180,13 +211,13 @@ function renderHero(meetings, isToday, schoolNow) {
     els.heroCard.innerHTML = `<div class="hero-empty">
       <div class="hero-label">今天</div>
       <h2 class="hero-name">今天的课上完了</h2>
-      <div class="hero-meta">${next ? `下一次：${relativeDateLabel(next.date)} ${displayStart(next.meeting)} · ${esc(next.meeting.course)}` : '当前学期暂时没有后续课程'}</div>
+      <div class="hero-meta">${next ? `下一次：${relativeDateLabel(next.date)} ${displayStart(next.meeting, next.date)} · ${esc(next.meeting.course)}` : '当前学期暂时没有后续课程'}</div>
     </div>`;
     return;
   }
 
   const meeting = status.meeting || meetings[0];
-  const t = meetingTime(meeting, state.periods);
+  const t = meetingTimeForDate(meeting, state.selectedDate, m);
   let label = '第一节课';
   let countdown = '';
   let progress = '';
@@ -219,23 +250,24 @@ function renderHero(meetings, isToday, schoolNow) {
 }
 
 function renderCourseList(meetings, isToday, schoolNow) {
+  const m = model();
   if (!meetings.length) {
     els.courseList.innerHTML = `<div class="empty-list"><strong>这天没有课</strong><span>可以安排自己的时间。</span></div>`;
     return;
   }
 
   els.courseList.innerHTML = meetings.map(meeting => {
-    const t = meetingTime(meeting, state.periods);
+    const t = meetingTimeForDate(meeting, state.selectedDate, m);
     const active = isToday && t.startMinutes !== null && t.endMinutes !== null && schoolNow.minutes >= t.startMinutes && schoolNow.minutes < t.endMinutes;
     const past = isToday && t.endMinutes !== null && schoolNow.minutes >= t.endMinutes;
     const pending = meeting.confidence && meeting.confidence !== 'verified';
     return `<article class="course-card${active ? ' is-active' : ''}${past ? ' is-past' : ''}" style="--course-color:${meeting.color || '#315efb'}">
-      <div class="course-time">${esc(displayStart(meeting))}<small>第 ${meeting.startPeriod}${meeting.endPeriod !== meeting.startPeriod ? `–${meeting.endPeriod}` : ''} 节</small></div>
+      <div class="course-time">${esc(displayStart(meeting, state.selectedDate))}<small>第 ${meeting.startPeriod}${meeting.endPeriod !== meeting.startPeriod ? `–${meeting.endPeriod}` : ''} 节</small></div>
       <div class="course-bar"></div>
       <div class="course-main">
         <div class="course-title-row"><div class="course-name">${esc(meeting.course)}</div>${active ? '<span class="live-badge">进行中</span>' : ''}</div>
         <div class="course-detail">${esc(meeting.location || '地点待确认')}${meeting.teacher ? `<br>${esc(meeting.teacher)}` : ''}</div>
-        <div class="course-tags"><span class="tag">${esc(summarizeWeeks(meeting.weeks))}</span>${pending ? '<span class="tag pending">待核对</span>' : ''}</div>
+        <div class="course-tags"><span class="tag">${esc(meeting.exception && (!meeting.weeks || !meeting.weeks.length) ? '临时课程' : summarizeWeeks(meeting.weeks))}</span>${meeting.movedFrom ? `<span class="tag">调自 ${esc(meeting.movedFrom.slice(5))}</span>` : ''}${pending ? '<span class="tag pending">待核对</span>' : ''}</div>
       </div>
     </article>`;
   }).join('');
@@ -261,7 +293,7 @@ function renderWeek() {
     const iso = addDaysISO(monday, i);
     const ms = meetingsForDate(iso, model());
     const inner = ms.length ? ms.map(x => `<div class="week-course">
-      <div class="week-course-time">${esc(displayStart(x))}</div>
+      <div class="week-course-time">${esc(displayStart(x, iso))}</div>
       <div class="week-course-bar" style="--course-color:${x.color || '#315efb'}"></div>
       <div><div class="week-course-name">${esc(x.course)}</div><div class="week-course-meta">${esc(x.location || '地点待确认')}</div></div>
     </div>`).join('') : '<div class="week-empty">无课</div>';
@@ -284,12 +316,12 @@ function renderAbout() {
   els.infoPending.textContent = pending ? `${pending} 项` : '无';
 }
 
-function displayStart(meeting) {
-  return state.periods.find(p => p.index === meeting.startPeriod)?.start || `第${meeting.startPeriod}节`;
+function displayStart(meeting, iso = state.selectedDate) {
+  return periodsForDate(iso, model()).find(p => p.index === meeting.startPeriod)?.start || `第${meeting.startPeriod}节`;
 }
 
 function displayTimeRange(meeting) {
-  const {start, end} = meetingTime(meeting, state.periods);
+  const {start, end} = meetingTimeForDate(meeting, state.selectedDate, model());
   if (start && end) return `${start}–${end}`;
   if (start) return `${start} · 第${meeting.startPeriod}–${meeting.endPeriod}节`;
   return `第${meeting.startPeriod}–${meeting.endPeriod}节`;

@@ -21,6 +21,10 @@ export function semesterWeek(iso, semester) {
   return Math.floor((isoToUtcMs(iso) - isoToUtcMs(semester.firstWeekMonday)) / 604800000) + 1;
 }
 
+export function semesterEndDate(semester) {
+  return addDaysISO(semester.firstWeekMonday, semester.weekCount * 7 - 1);
+}
+
 export function zonedNow(timeZone, now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
@@ -42,7 +46,20 @@ export function timeToMinutes(time) {
 }
 
 export function periodMap(periods) {
-  return new Map(periods.map(p => [p.index, p]));
+  return new Map((periods || []).map(p => [p.index, p]));
+}
+
+export function periodsForDate(iso, model) {
+  const profiles = model?.timeProfiles || model?.semester?.timeProfiles || [];
+  if (Array.isArray(profiles) && profiles.length) {
+    const profile = profiles.find(p => {
+      const afterStart = !p.effectiveFrom || iso >= p.effectiveFrom;
+      const beforeEnd = !p.effectiveTo || iso <= p.effectiveTo;
+      return afterStart && beforeEnd;
+    });
+    if (profile?.periods?.length) return profile.periods;
+  }
+  return model?.periods || [];
 }
 
 export function meetingTime(meeting, periods) {
@@ -52,20 +69,44 @@ export function meetingTime(meeting, periods) {
   return { start, end, startMinutes: timeToMinutes(start), endMinutes: timeToMinutes(end) };
 }
 
-export function meetingsForDate(iso, model) {
-  const { semester, meetings, exceptions = [] } = model;
-  const week = semesterWeek(iso, semester);
+export function meetingTimeForDate(meeting, iso, model) {
+  return meetingTime(meeting, periodsForDate(iso, model));
+}
+
+function baseMeetingsForDate(iso, model, {weekdayOverride = null, weekOverride = null} = {}) {
+  const { semester, meetings } = model;
+  const week = weekOverride ?? semesterWeek(iso, semester);
   if (week < 1 || week > semester.weekCount) return [];
-
-  const dayRules = exceptions.filter(e => e.date === iso);
-  if (dayRules.some(e => e.action === 'dayOff')) return [];
-
-  const weekdayRule = dayRules.find(e => e.action === 'useWeekday');
-  const weekday = weekdayRule?.weekday || weekdayOfISO(iso);
-
-  let result = meetings
+  const weekday = weekdayOverride ?? weekdayOfISO(iso);
+  return meetings
     .filter(m => m.weekday === weekday && Array.isArray(m.weeks) && m.weeks.includes(week))
     .map(m => ({ ...m }));
+}
+
+export function meetingsForDate(iso, model) {
+  const { semester, exceptions = [] } = model;
+  const currentWeek = semesterWeek(iso, semester);
+  if (currentWeek < 1 || currentWeek > semester.weekCount) return [];
+
+  const dayRules = exceptions.filter(e => e.date === iso);
+  let result;
+
+  const useDateRule = dayRules.find(e => e.action === 'useDate' && e.sourceDate);
+  const weekdayRule = dayRules.find(e => e.action === 'useWeekday' && e.weekday >= 1 && e.weekday <= 7);
+  const dayOff = dayRules.some(e => e.action === 'dayOff');
+
+  if (useDateRule) {
+    const sourceDate = useDateRule.sourceDate;
+    const sourceWeek = semesterWeek(sourceDate, semester);
+    result = baseMeetingsForDate(sourceDate, model, {weekOverride: sourceWeek})
+      .map(m => ({ ...m, exception: true, movedFrom: sourceDate }));
+  } else if (dayOff) {
+    result = [];
+  } else if (weekdayRule) {
+    result = baseMeetingsForDate(iso, model, {weekdayOverride: weekdayRule.weekday});
+  } else {
+    result = baseMeetingsForDate(iso, model);
+  }
 
   for (const rule of dayRules) {
     if (rule.action === 'cancel') {
@@ -77,7 +118,7 @@ export function meetingsForDate(iso, model) {
     }
   }
 
-  return result.sort((a, b) => a.startPeriod - b.startPeriod || a.endPeriod - b.endPeriod);
+  return result.sort((a, b) => a.startPeriod - b.startPeriod || a.endPeriod - b.endPeriod || String(a.course).localeCompare(String(b.course), 'zh-CN'));
 }
 
 export function dayStatus(iso, model, now = new Date()) {
@@ -88,12 +129,12 @@ export function dayStatus(iso, model, now = new Date()) {
   if (iso !== schoolNow.iso) return { kind: 'first', meeting: meetings[0], meetings };
 
   for (const meeting of meetings) {
-    const t = meetingTime(meeting, model.periods);
+    const t = meetingTimeForDate(meeting, iso, model);
     if (t.startMinutes !== null && t.endMinutes !== null && schoolNow.minutes >= t.startMinutes && schoolNow.minutes < t.endMinutes) {
       return { kind: 'active', meeting, minutesRemaining: t.endMinutes - schoolNow.minutes, meetings };
     }
     if (t.startMinutes !== null && t.endMinutes === null) {
-      const firstPeriodEnd = timeToMinutes(model.periods.find(p => p.index === meeting.startPeriod)?.end);
+      const firstPeriodEnd = timeToMinutes(periodsForDate(iso, model).find(p => p.index === meeting.startPeriod)?.end);
       if (firstPeriodEnd !== null && schoolNow.minutes >= t.startMinutes && schoolNow.minutes < firstPeriodEnd) {
         return { kind: 'activePartial', meeting, meetings };
       }
@@ -101,22 +142,24 @@ export function dayStatus(iso, model, now = new Date()) {
   }
 
   const upcoming = meetings.find(m => {
-    const t = meetingTime(m, model.periods);
+    const t = meetingTimeForDate(m, iso, model);
     return t.startMinutes !== null && t.startMinutes > schoolNow.minutes;
   });
   if (upcoming) {
-    const t = meetingTime(upcoming, model.periods);
+    const t = meetingTimeForDate(upcoming, iso, model);
     return { kind: 'next', meeting: upcoming, minutesUntil: t.startMinutes - schoolNow.minutes, meetings };
   }
 
   return { kind: 'finished', meeting: meetings.at(-1), meetings };
 }
 
-export function nextMeetingAfter(iso, model, maxDays = 21) {
-  for (let offset = 1; offset <= maxDays; offset++) {
-    const date = addDaysISO(iso, offset);
+export function nextMeetingAfter(iso, model) {
+  const end = semesterEndDate(model.semester);
+  let date = iso;
+  while (date < end) {
+    date = addDaysISO(date, 1);
     const ms = meetingsForDate(date, model);
-    if (ms.length) return { date, meeting: ms[0], daysAway: offset };
+    if (ms.length) return { date, meeting: ms[0], daysAway: Math.round((isoToUtcMs(date) - isoToUtcMs(iso)) / 86400000) };
   }
   return null;
 }
@@ -139,4 +182,21 @@ export function formatDuration(minutes) {
   if (minutes < 60) return `${minutes} 分钟`;
   const h = Math.floor(minutes / 60), m = minutes % 60;
   return m ? `${h} 小时 ${m} 分钟` : `${h} 小时`;
+}
+
+export function findScheduleConflicts(meetings = []) {
+  const conflicts = [];
+  for (let i = 0; i < meetings.length; i++) {
+    for (let j = i + 1; j < meetings.length; j++) {
+      const a = meetings[i], b = meetings[j];
+      if (a.weekday !== b.weekday) continue;
+      const periodOverlap = Math.max(a.startPeriod, b.startPeriod) <= Math.min(a.endPeriod, b.endPeriod);
+      if (!periodOverlap) continue;
+      const bWeeks = new Set(b.weeks || []);
+      const overlapWeeks = (a.weeks || []).filter(w => bWeeks.has(w));
+      if (!overlapWeeks.length) continue;
+      conflicts.push({a, b, weeks: overlapWeeks});
+    }
+  }
+  return conflicts;
 }

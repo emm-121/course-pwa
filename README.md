@@ -1,48 +1,43 @@
-# 今日课表 PWA v0.2
+# Course PWA v0.4 RC
 
-这是从第一版原型重构后的可部署测试版，目标是让使用者平时只做一件事：打开主屏幕上的“今日课表”。
+手机优先的每日大学课表 PWA。此版定位为“给朋友真实使用前的候选版”：先把我们自己能验证的基础能力补齐，再做一次真实教务导入测试。
 
-## 当前能力
+## 已完成
 
-- iPhone / Android 手机优先界面
-- 自动按学校时区（Asia/Shanghai）判断“今天”
-- 已确认第 1 周周一为 2026-08-31；第 4 周为 2026-09-21 至 09-27
-- 自动计算教学周、周次过滤
-- 当前上课 / 下一节 / 今日已结束状态
-- 纵向本周课表，不需要横向拖动
-- 日期切换、左右滑切换日期
-- dayOff / useWeekday / cancel / modify / add 异常规则核心
-- 网络优先 + 离线缓存：部署后数据更新优先取新版，断网读取缓存
-- 正方教务导入器与主体解耦，位于 `importers/zhengfang.js`
+- 今日 / 日期浏览 / 本周视图
+- 按学校时区计算日期和周次
+- 正在上课 / 下一节 / 今日结束状态
+- 不连续周、单双周归一化后的 `weeks[]`
+- 远程数据优先 + Service Worker 离线兜底
+- 新版正方 Safari 快捷指令 DOM 导入（待真实页面最终验证）
+- WakeUp / Sleepy 兼容 JSON 备用导入
+- 导入后冲突检查
+- 日期例外：全天停课、按星期、按**具体来源日期**复制课表、单节取消/修改/补课
+- `manage.html` 图形化生成 `exceptions.json`
+- 国家法定节假日提示层（只提示，不擅自替学校删课）
+- 多作息时间段 `timeProfiles` 数据结构，为学校季节作息切换预留
 
-## 数据文件
+## 为什么新增 useDate
 
-- `data/semester.json`：学期、周数、节次时间
-- `data/schedule.json`：基础课程安排
-- `data/exceptions.json`：临时停课、补课、换教室等
+学校节假日调课可能跨周。比如“10 月 7 日的课调到 9 月 28 日”，如果只写“9 月 28 日按周二上课”，程序会套用 9 月 28 日所在周的单双周/分段周次，可能出错。`useDate` 会直接复制来源日期的真实课表，保留来源周次。
 
-目前课程由用户提供的学期课表截图整理。`confidence` 不为 `verified` 的记录会在界面显示“待核对”。
+## 文件
 
-## 本地运行
+- `index.html` / `app.js` / `core.js`：主 PWA
+- `data/semester.json`：学期、作息时间和时间配置
+- `data/schedule.json`：正式课表
+- `data/exceptions.json`：学校停课、补课、调课等权威日期例外
+- `data/holidays.json`：国家节假日提示（非学校权威调课）
+- `import.html`：课表导入检查器
+- `manage.html`：调课/停课规则生成器
+- `importers/zhengfang.js`：正方 DOM 解析器
+- `importers/wakeup.js`：WakeUp / Sleepy JSON 兼容导入
+- `tools/zhengfang-shortcut.js`：iPhone 快捷指令脚本
 
-直接双击 `index.html` 可能会被浏览器的 file:// 安全策略阻止读取 JSON。建议在目录中运行一个静态服务器，例如：
+## 部署
 
-```bash
-python3 -m http.server 8000
-```
+GitHub Pages：`main` → `/(root)`。
 
-然后打开 `http://localhost:8000/`。
+## 尚需朋友参与的唯一关键验证
 
-手机快速看样子可直接打开根目录里的单文件 `course-pwa-v0.2-preview.html`（该文件由交付时生成，不具备完整 PWA 安装/离线能力）。
-
-## GitHub Pages
-
-把本目录上传到 GitHub 仓库，Settings → Pages → Deploy from a branch → `main` / root。用 Safari 打开 Pages 地址后，“分享 → 添加到主屏幕”。
-
-## 测试
-
-```bash
-npm test
-```
-
-当前项目无运行时第三方依赖。
+在真实教务页面运行一次 Safari 快捷指令。成功则直接得到整学期 JSON；失败则只返回诊断 JSON，据此修适配器，不再逐张截图。
