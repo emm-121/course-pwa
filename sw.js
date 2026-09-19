@@ -1,7 +1,8 @@
-const CACHE = 'course-pwa-v0.4.0';
+const CACHE = 'course-pwa-v0.5.0';
+
+// 只缓存普通使用需要的文件。维护页和测试页不属于离线应用外壳。
 const SHELL = [
-  './', './index.html', './import.html', './manage.html', './shortcut-setup.html', './styles.css', './app.js', './core.js',
-  './importers/zhengfang.js', './importers/wakeup.js', './manifest.webmanifest',
+  './', './index.html', './styles.css', './app.js', './core.js', './manifest.webmanifest',
   './data/semester.json', './data/schedule.json', './data/exceptions.json', './data/holidays.json',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'
 ];

@@ -48,7 +48,7 @@ async function boot() {
 }
 
 function cacheEls() {
-  for (const id of ['semesterLabel','headline','dateStrip','dateTitle','dateSubtitle','holidayBanner','courseList','courseCount','heroCard','nextDayCard','weekList','weekRange','datePicker','toast','infoSemester','infoStart','infoUpdated','infoPending']) {
+  for (const id of ['semesterLabel','headline','dateStrip','dateTitle','dateSubtitle','holidayBanner','courseList','courseCount','heroCard','nextDayCard','weekList','weekRange','datePicker','toast','infoSemester','infoStart','infoUpdated','infoMode','refreshState','installCard']) {
     els[id] = document.getElementById(id);
   }
 }
@@ -65,6 +65,7 @@ function bindEvents() {
   els.datePicker.addEventListener('change', e => e.target.value && setDate(e.target.value));
 
   document.querySelectorAll('.nav-item').forEach(btn => btn.addEventListener('click', () => switchView(btn.dataset.view)));
+  document.getElementById('refreshBtn').addEventListener('click', manualRefresh);
 
   const todayView = document.getElementById('todayView');
   todayView.addEventListener('touchstart', e => {
@@ -117,7 +118,9 @@ async function refreshData(silent = true) {
   state.lastRefresh = Date.now();
 
   if (state.selectedDate) render();
-  if (silent && oldUpdated && sch.updatedAt !== oldUpdated) toast('课表数据已更新');
+  const changed = Boolean(oldUpdated && sch.updatedAt !== oldUpdated);
+  if (silent && changed) toast('课表数据已更新');
+  return {changed, updatedAt: sch.updatedAt || null};
 }
 
 async function loadJson(url) {
@@ -231,7 +234,7 @@ function renderHero(meetings, isToday, schoolNow) {
     progress = `<div class="hero-progress"><i style="width:${percent.toFixed(1)}%"></i></div>`;
   } else if (status.kind === 'activePartial') {
     label = '正在上课';
-    countdown = '结束时间待核对';
+    countdown = '结束时间暂未显示';
   } else if (status.kind === 'next') {
     label = '下一节';
     countdown = `${formatDuration(status.minutesUntil)}后开始`;
@@ -244,7 +247,7 @@ function renderHero(meetings, isToday, schoolNow) {
     <div class="${labelClass}">${label}</div>
     <div class="hero-time">${esc(displayTimeRange(meeting))}</div>
     <h2 class="hero-name">${esc(meeting.course)}</h2>
-    <div class="hero-meta">${esc(meeting.location || '地点待确认')}${meeting.teacher ? `<br>${esc(meeting.teacher)}` : ''}</div>
+    <div class="hero-meta">${esc(meeting.location || '地点未提供')}${meeting.teacher ? `<br>${esc(meeting.teacher)}` : ''}</div>
     <div class="hero-bottom"><span class="hero-countdown">${esc(countdown)}</span><span class="hero-periods">第 ${meeting.startPeriod}${meeting.endPeriod !== meeting.startPeriod ? `–${meeting.endPeriod}` : ''} 节</span></div>
     ${progress}`;
 }
@@ -260,14 +263,13 @@ function renderCourseList(meetings, isToday, schoolNow) {
     const t = meetingTimeForDate(meeting, state.selectedDate, m);
     const active = isToday && t.startMinutes !== null && t.endMinutes !== null && schoolNow.minutes >= t.startMinutes && schoolNow.minutes < t.endMinutes;
     const past = isToday && t.endMinutes !== null && schoolNow.minutes >= t.endMinutes;
-    const pending = meeting.confidence && meeting.confidence !== 'verified';
     return `<article class="course-card${active ? ' is-active' : ''}${past ? ' is-past' : ''}" style="--course-color:${meeting.color || '#315efb'}">
       <div class="course-time">${esc(displayStart(meeting, state.selectedDate))}<small>第 ${meeting.startPeriod}${meeting.endPeriod !== meeting.startPeriod ? `–${meeting.endPeriod}` : ''} 节</small></div>
       <div class="course-bar"></div>
       <div class="course-main">
         <div class="course-title-row"><div class="course-name">${esc(meeting.course)}</div>${active ? '<span class="live-badge">进行中</span>' : ''}</div>
-        <div class="course-detail">${esc(meeting.location || '地点待确认')}${meeting.teacher ? `<br>${esc(meeting.teacher)}` : ''}</div>
-        <div class="course-tags"><span class="tag">${esc(meeting.exception && (!meeting.weeks || !meeting.weeks.length) ? '临时课程' : summarizeWeeks(meeting.weeks))}</span>${meeting.movedFrom ? `<span class="tag">调自 ${esc(meeting.movedFrom.slice(5))}</span>` : ''}${pending ? '<span class="tag pending">待核对</span>' : ''}</div>
+        <div class="course-detail">${esc(meeting.location || '地点未提供')}${meeting.teacher ? `<br>${esc(meeting.teacher)}` : ''}</div>
+        <div class="course-tags"><span class="tag">${esc(meeting.exception && (!meeting.weeks || !meeting.weeks.length) ? '临时课程' : summarizeWeeks(meeting.weeks))}</span>${meeting.movedFrom ? `<span class="tag">调自 ${esc(meeting.movedFrom.slice(5))}</span>` : ''}</div>
       </div>
     </article>`;
   }).join('');
@@ -276,9 +278,10 @@ function renderCourseList(meetings, isToday, schoolNow) {
 function renderNextDay() {
   const nextDate = addDaysISO(state.selectedDate, 1);
   const ms = meetingsForDate(nextDate, model());
-  const label = weekdayLabel(nextDate);
+  const today = zonedNow(state.semester.timezone).iso;
+  const title = state.selectedDate === today ? `明天 · ${weekdayLabel(nextDate)}` : `${shortDate(nextDate)} · ${weekdayLabel(nextDate)}`;
   const summary = ms.length ? `${ms.length} 门课 · ${ms.slice(0,2).map(x => x.course).join('、')}${ms.length > 2 ? '…' : ''}` : '没有课程';
-  els.nextDayCard.innerHTML = `<span><strong>明天 · ${label}</strong><small>${esc(summary)}</small></span><span class="arrow">›</span>`;
+  els.nextDayCard.innerHTML = `<span><strong>${esc(title)}</strong><small>${esc(summary)}</small></span><span class="arrow">›</span>`;
   els.nextDayCard.onclick = () => setDate(nextDate);
 }
 
@@ -295,7 +298,7 @@ function renderWeek() {
     const inner = ms.length ? ms.map(x => `<div class="week-course">
       <div class="week-course-time">${esc(displayStart(x, iso))}</div>
       <div class="week-course-bar" style="--course-color:${x.color || '#315efb'}"></div>
-      <div><div class="week-course-name">${esc(x.course)}</div><div class="week-course-meta">${esc(x.location || '地点待确认')}</div></div>
+      <div><div class="week-course-name">${esc(x.course)}</div><div class="week-course-meta">${esc(x.location || '地点未提供')}</div></div>
     </div>`).join('') : '<div class="week-empty">无课</div>';
     return `<section class="week-day${iso === today ? ' is-today' : ''}" data-date="${iso}">
       <div class="week-day-header"><strong>${weekdayLabel(iso)} · ${shortDate(iso)}</strong><span>${ms.length ? `${ms.length} 门课` : '无课'}</span></div>${inner}
@@ -312,8 +315,33 @@ function renderAbout() {
   els.infoSemester.textContent = state.semester.label;
   els.infoStart.textContent = state.semester.firstWeekMonday;
   els.infoUpdated.textContent = state.scheduleMeta?.updatedAt ? state.scheduleMeta.updatedAt.slice(0,10) : '—';
-  const pending = state.meetings.filter(x => x.confidence && x.confidence !== 'verified').length;
-  els.infoPending.textContent = pending ? `${pending} 项` : '无';
+  const standalone = isStandalone();
+  els.infoMode.textContent = standalone ? '主屏幕 App' : 'Safari 网页';
+  els.installCard.hidden = standalone;
+  els.refreshState.textContent = navigator.onLine ? '联网时会获取最新数据' : '当前离线，正在使用缓存';
+}
+
+async function manualRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  const before = state.scheduleMeta?.updatedAt || null;
+  btn.disabled = true;
+  els.refreshState.textContent = '正在检查…';
+  try {
+    const result = await refreshData(false);
+    const changed = result.changed || (before && result.updatedAt && before !== result.updatedAt);
+    els.refreshState.textContent = navigator.onLine ? '刚刚检查过' : '当前离线，正在使用缓存';
+    toast(changed ? '课表已更新' : '已经是最新课表');
+  } catch (error) {
+    console.error(error);
+    els.refreshState.textContent = '检查失败，请稍后再试';
+    toast('暂时无法检查更新');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function isStandalone() {
+  return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true;
 }
 
 function displayStart(meeting, iso = state.selectedDate) {

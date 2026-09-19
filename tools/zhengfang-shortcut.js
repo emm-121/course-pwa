@@ -1,8 +1,8 @@
 /*
- * Course PWA · 正方课表导出脚本 v1
+ * Course PWA · 正方课表导出脚本 v2
  * 用法：粘贴到 iPhone「快捷指令」的“在网页上运行 JavaScript”动作中，
  * 并从 Safari 已打开的“学生课表查询（学期课表）”页面运行。
- * 输出：可直接作为 data/schedule.json 使用的 JSON 文本。
+ * 输出：紧凑 JSON 文本；建议在快捷指令中把下一步设置为“共享”。
  */
 (function () {
   'use strict';
@@ -121,6 +121,35 @@
     return '';
   }
 
+  function extractPeriods(table) {
+    const found = new Map();
+    for (const row of table.querySelectorAll('tr')) {
+      const cell = row.cells && row.cells[0];
+      if (!cell) continue;
+      const text = clean(cell.innerText || cell.textContent || '');
+      const times = text.match(/\b(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b/g) || [];
+      const idx = text.match(/^\s*(\d{1,2})\b/);
+      if (!idx || times.length < 2) continue;
+      const n = +idx[1];
+      if (n < 1 || n > 30) continue;
+      found.set(n, {index:n,start:times[0].slice(0,5),end:times[1].slice(0,5)});
+    }
+    return [...found.values()].sort((a,b)=>a.index-b.index);
+  }
+
+  function addDays(iso, days) {
+    const [y,m,d] = iso.split('-').map(Number);
+    return new Date(Date.UTC(y,m-1,d) + days*86400000).toISOString().slice(0,10);
+  }
+
+  function semesterDateHint() {
+    const raw = String(document.body?.innerText || document.body?.textContent || '').replace(/\s+/g,' ');
+    const m = raw.match(/(?:周次[:：]?\s*)?(\d{1,2})\s*\(\s*(\d{4}-\d{2}-\d{2})\s*至\s*(\d{4}-\d{2}-\d{2})\s*\)/);
+    if (!m) return null;
+    const week = +m[1], startDate = m[2], endDate = m[3];
+    return {week,startDate,endDate,firstWeekMonday:addDays(startDate,-7*(week-1))};
+  }
+
   try {
     const table=document.getElementById('kbgrid_table_0') || document.querySelector('table[id^="kbgrid_table_"]') || [...document.querySelectorAll('table')].find(t => /周一/.test(clean(t.innerText||t.textContent||'')) && /周二/.test(clean(t.innerText||t.textContent||'')));
     if(!table) {
@@ -143,8 +172,11 @@
       completion(JSON.stringify({ok:false,message:'找到了课表，但没有识别到课程。请把这段诊断结果发回来，不需要再截图。',diagnostics:{url:safeUrl(),tableId:table.id||'',text:clean(table.innerText||table.textContent||'').slice(0,1800)}}));
       return;
     }
-    const payload={schemaVersion:3,updatedAt:new Date().toISOString(),source:'正方教务学期课表自动导入（'+location.host+'）',importMeta:{parser:'zhengfang-shortcut-v1',semesterHint:{academicYear:selected(['#xnm','select[name="xnm"]','select[id*="xnm"]']),term:selected(['#xqm','select[name="xqm"]','select[id*="xqm"]'])},sourceUrl:safeUrl()},meetings};
-    completion(JSON.stringify(payload,null,2));
+    const dateHint=semesterDateHint();
+    const periodHint=extractPeriods(table);
+    const maxWeek=Math.max(0,...meetings.flatMap(m=>m.weeks||[]));
+    const payload={schemaVersion:3,updatedAt:new Date().toISOString(),source:'正方教务学期课表自动导入（'+location.host+'）',importMeta:{parser:'zhengfang-shortcut-v2',semesterHint:{academicYear:selected(['#xnm','select[name="xnm"]','select[id*="xnm"]']),term:selected(['#xqm','select[name="xqm"]','select[id*="xqm"]']),firstWeekMonday:dateHint?.firstWeekMonday||'',weekCount:maxWeek||null,dateRange:dateHint||null},periodsHint:periodHint,sourceUrl:safeUrl()},meetings};
+    completion(JSON.stringify(payload));
   } catch (error) {
     completion(JSON.stringify({ok:false,message:'导出脚本运行失败',error:String(error && (error.stack||error.message) || error),diagnostics:{url:safeUrl()}}));
   }

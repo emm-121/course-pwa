@@ -67,36 +67,32 @@
     <section id="aboutView" class="view">
       <div class="about-card">
         <div class="about-icon">✓</div>
-        <h2>课表已就绪</h2>
-        <p>这一版直接读取远程课表数据。以后你更新 GitHub 上的数据，他重新打开就能拿到新版本；断网时继续使用最近一次缓存。</p>
+        <h2>课表已同步</h2>
+        <p>打开时会自动检查最新课表；没有网络时也可以继续查看最近一次成功加载的数据。</p>
       </div>
 
       <div class="info-list">
         <div><span>学期</span><strong id="infoSemester">—</strong></div>
         <div><span>第一周</span><strong id="infoStart">—</strong></div>
-        <div><span>数据更新时间</span><strong id="infoUpdated">—</strong></div>
-        <div><span>待核对项目</span><strong id="infoPending">—</strong></div>
+        <div><span>课表更新</span><strong id="infoUpdated">—</strong></div>
+        <div><span>打开方式</span><strong id="infoMode">—</strong></div>
       </div>
 
-      <a class="notice-card notice-link" href="./import.html">
-        <strong>课表导入助手 →</strong>
-        <p>接收正方快捷指令或 WakeUp/Sleepy JSON，检查后生成可直接上传到 GitHub 的 schedule.json。</p>
-      </a>
+      <button class="action-card" id="refreshBtn" type="button">
+        <span><strong>检查课表更新</strong><small id="refreshState">联网时会获取最新数据</small></span><span class="arrow">›</span>
+      </button>
 
-      <a class="notice-card notice-link" href="./shortcut-setup.html">
-        <strong>正方快捷指令准备 / 自测 →</strong>
-        <p>先用内置模拟课表验证 Safari 导出流程，再让朋友在真实教务页面跑一次。</p>
-      </a>
-
-      <a class="notice-card notice-link" href="./manage.html">
-        <strong>调课 / 停课维护 →</strong>
-        <p>不用手改 JSON：生成全天停课、跨周补课、按星期上课等 exceptions.json。</p>
-      </a>
-
-      <div class="notice-card">
-        <strong>正方导入状态</strong>
-        <p>已完成通用新版正方 DOM 解析器，并提供 WakeUp/Sleepy JSON 作为备用导入路径。真实教务页面仍需最后一次验证；失败时只需要诊断 JSON，不需要继续逐张截图。</p>
+      <div class="notice-card" id="installCard" hidden>
+        <strong>建议添加到主屏幕</strong>
+        <p>在 iPhone 的 Safari 中点“分享” → “添加到主屏幕”。之后可以像普通 App 一样直接打开。</p>
       </div>
+
+      <div class="notice-card subtle-card">
+        <strong>关于节假日和调课</strong>
+        <p>法定节假日只用于提示；是否停课、补课或换教室，以学校实际教学安排为准。已确认的变化会自动显示在这里。</p>
+      </div>
+
+      <div class="version-line">今日课表 · v0.5</div>
     </section>
   </main>
 

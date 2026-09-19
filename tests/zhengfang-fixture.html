@@ -1,13 +1,35 @@
-<!doctype html><meta charset="utf-8"><title>fixture</title>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>正方课表模拟页</title>
+  <style>body{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif;padding:20px;line-height:1.6}table{border-collapse:collapse;width:100%}td{border:1px solid #ddd;padding:10px;vertical-align:top}.period{width:100px;color:#666}pre{white-space:pre-wrap;font-size:12px}</style>
+</head>
+<body>
+<h1>正方课表模拟页</h1>
+<p>仅用于测试快捷指令，不含真实个人信息。</p>
 <select id="xnm"><option selected>2026-2027</option></select>
 <select id="xqm"><option selected>1</option></select>
-<table id="kbgrid_table_0"><tbody><tr>
-<td id="1-1"><div><span><font>高等数学（一）</font></span><p><span title="节/周"></span><font>(1-2节)1-16周</font></p><p><span title="上课地点"></span><font>新城校区 4102</font></p><p><span title="教师"></span><font>张老师</font></p></div></td>
-<td id="2-1"><div><span><font>大学英语</font></span><p><span title="节/周"></span><font>(3-4节)1-16周(单)</font></p><p><span title="上课地点"></span><font>5301</font></p><p><span title="教师"></span><font>李老师</font></p></div></td>
-</tr></tbody></table>
+<div>周次：4(2026-09-21至2026-09-27)</div>
+<table id="kbgrid_table_0"><tbody>
+<tr>
+  <td class="period">1<br>08:00:00<br>08:50:00</td>
+  <td id="1-1"><div><span><font>高等数学（一）</font></span><p><span title="节/周"></span><font>(1-2节)1-16周</font></p><p><span title="上课地点"></span><font>新城校区 4102</font></p><p><span title="教师"></span><font>张老师</font></p></div></td>
+  <td id="2-1"></td>
+</tr>
+<tr>
+  <td class="period">3<br>10:10:00<br>11:00:00</td>
+  <td id="1-2"></td>
+  <td id="2-2"><div><span><font>大学英语</font></span><p><span title="节/周"></span><font>(3-4节)1-16周(单)</font></p><p><span title="上课地点"></span><font>5301</font></p><p><span title="教师"></span><font>李老师</font></p></div></td>
+</tr>
+</tbody></table>
 <pre id="out"></pre>
 <script type="module">
 import {parseZhengfangDocument, buildScheduleJson} from '../importers/zhengfang.js';
 const p=parseZhengfangDocument(document,{host:'example.edu.cn',href:location.href,title:document.title});
-document.getElementById('out').textContent=JSON.stringify(p.ok?buildScheduleJson(p,new Date('2026-09-20T00:00:00Z')):p);
+document.getElementById('out').textContent=JSON.stringify(p.ok?buildScheduleJson(p,new Date('2026-09-20T00:00:00Z')):p,null,2);
 </script>
+</body>
+</html>

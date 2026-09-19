@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#f4f6fb" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>课表维护</title>
+</head>
+<body>
+<main class="app-shell import-shell">
+  <header class="topbar">
+    <div class="topbar-copy"><div class="eyebrow">仅供维护</div><h1>课表维护</h1></div>
+    <a class="today-button import-close" href="./" aria-label="返回">×</a>
+  </header>
+
+  <section class="import-card">
+    <span class="import-step">✓</span>
+    <div><h2>日常页面已与维护工具分离</h2><p>这些入口不会出现在普通课表首页。需要更新课程、调课或重新准备导出快捷指令时再打开这里。</p></div>
+  </section>
+
+  <div class="admin-grid">
+    <a class="admin-link" href="./semester.html"><strong>学期与作息 →</strong><span>每学期确认第一周、总周数和节次时间，生成 semester.json。</span></a>
+    <a class="admin-link" href="./import.html"><strong>导入新学期课表 →</strong><span>接收正方快捷指令、WakeUp / Sleepy JSON，检查冲突后生成 schedule.json。</span></a>
+    <a class="admin-link" href="./manage.html"><strong>停课 / 调课 / 换教室 →</strong><span>生成 exceptions.json，不需要手改 JSON。</span></a>
+    <a class="admin-link" href="./shortcut-setup.html"><strong>正方导出快捷指令 →</strong><span>查看最终快捷指令结构、测试页和分享给使用者的方法。</span></a>
+    <a class="admin-link" href="./tools/zhengfang-fixture.html"><strong>正方模拟课表 →</strong><span>用于验证 Safari → 快捷指令 → JSON 导出链路，不含真实个人信息。</span></a>
+  </div>
+
+  <section class="import-card muted-card">
+    <span class="import-step">i</span>
+    <div><h2>这不是权限保护页</h2><p>GitHub Pages 是静态公开站点。这个页面只是从普通 UI 隐藏维护入口，不保存密码、Cookie 或 GitHub 写入凭据。</p></div>
+  </section>
+</main>
+</body>
+</html>

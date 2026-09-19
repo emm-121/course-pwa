@@ -3,26 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
   <meta name="theme-color" content="#f4f6fb" />
   <link rel="stylesheet" href="./styles.css" />
-  <title>课表导入助手</title>
+  <title>课表导入</title>
 </head>
 <body>
   <main class="app-shell import-shell">
     <header class="topbar">
-      <div class="topbar-copy"><div class="eyebrow">维护工具</div><h1>课表导入</h1></div>
-      <a class="today-button import-close" href="./" aria-label="返回">×</a>
+      <div class="topbar-copy"><div class="eyebrow">仅供维护</div><h1>课表导入</h1></div>
+      <a class="today-button import-close" href="./admin.html" aria-label="返回维护页">×</a>
     </header>
 
     <section class="import-card">
       <span class="import-step">1</span>
-      <div><h2>粘贴或选择导出结果</h2><p>支持“正方课表快捷指令”、WakeUp / Sleepy 兼容 JSON，也支持现有 <code>schedule.json</code>。</p></div>
+      <div><h2>放入课表导出结果</h2><p>支持正方快捷指令导出的 JSON、WakeUp / Sleepy 兼容 JSON，也支持现有 <code>schedule.json</code>。</p></div>
     </section>
 
     <section class="import-panel">
       <label class="file-btn">选择 JSON 文件<input id="fileInput" type="file" accept="application/json,.json,text/plain" hidden /></label>
       <div class="import-or">或</div>
-      <textarea id="jsonInput" spellcheck="false" placeholder="把朋友发来的 JSON 文本粘贴到这里…"></textarea>
+      <textarea id="jsonInput" spellcheck="false" placeholder="把收到的课表 JSON 粘贴到这里…"></textarea>
       <button class="import-primary" id="checkBtn" type="button">检查课表</button>
     </section>
 
@@ -30,7 +31,7 @@
 
     <section class="import-card muted-card">
       <span class="import-step">?</span>
-      <div><h2>如果导出失败</h2><p>快捷指令会返回诊断 JSON。把那段 JSON 发回来即可，我们可以据此适配学校版本，不需要继续截整张课表。</p></div>
+      <div><h2>如果真实教务页面没识别成功</h2><p>导出脚本会返回诊断 JSON。保留这段诊断信息即可继续适配，不需要重新截完整课表。</p></div>
     </section>
   </main>
 
@@ -49,13 +50,28 @@
     });
     document.getElementById('checkBtn').addEventListener('click', check);
 
+    function parseLooseJson(text) {
+      let value = String(text || '').trim().replace(/^\uFEFF/, '');
+      value = value.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+      try { return JSON.parse(value); } catch {}
+      const firstObj = value.indexOf('{'), firstArr = value.indexOf('[');
+      let start = -1;
+      if (firstObj === -1) start = firstArr;
+      else if (firstArr === -1) start = firstObj;
+      else start = Math.min(firstObj, firstArr);
+      const endObj = value.lastIndexOf('}'), endArr = value.lastIndexOf(']');
+      const end = Math.max(endObj, endArr);
+      if (start >= 0 && end > start) return JSON.parse(value.slice(start, end + 1));
+      throw new Error('没有找到可解析的 JSON');
+    }
+
     function check() {
       result.hidden = false;
       try {
-        let data = JSON.parse(input.value.trim());
+        let data = parseLooseJson(input.value);
         if (data.ok === false && data.diagnostics) {
           current = null;
-          result.innerHTML = `<div class="result-bad"><strong>这是诊断结果，不是课表文件</strong><p>${esc(data.message || '解析失败')}</p><small>把这段 JSON 原样发回来即可继续适配。</small></div>`;
+          result.innerHTML = `<div class="result-bad"><strong>这是诊断结果，不是课表文件</strong><p>${esc(data.message || '解析失败')}</p><small>保留这段 JSON，后续可以据此适配教务页面。</small></div>`;
           return;
         }
         if (looksLikeWakeUpJson(data)) data = convertWakeUpJson(data);
@@ -64,8 +80,14 @@
         current = data;
         const conflicts = findScheduleConflicts(data.meetings);
         const courses = new Set(data.meetings.map(x => x.course));
-        const days = new Set(data.meetings.map(x => x.weekday));
-        result.innerHTML = `<div class="result-good"><strong>课表可以使用</strong><p>${data.meetings.length} 个上课安排 · ${courses.size} 门不同课程 · 覆盖 ${days.size} 个星期日</p>${conflicts.length ? `<p><b>⚠ 发现 ${conflicts.length} 组时间冲突</b>，请在下载前核对。第一组：${esc(conflicts[0].a.course)} ↔ ${esc(conflicts[0].b.course)}（${conflicts[0].weeks.join('、')}周）</p>` : '<p>未发现课程时间冲突。</p>'}<div class="result-actions"><button id="downloadBtn" class="import-primary" type="button">下载 schedule.json</button><button id="localBtn" class="import-secondary" type="button">仅在本机试用</button></div><small>正式使用时，把下载的文件替换 GitHub 仓库里的 <code>data/schedule.json</code>。</small></div>`;
+        const maxWeek = Math.max(0, ...data.meetings.flatMap(x => x.weeks || []));
+        const semHint = data.importMeta?.semesterHint || {};
+        const periodsHint = data.importMeta?.periodsHint || [];
+        const hints = [
+          semHint.firstWeekMonday ? `识别到第一周周一：${esc(semHint.firstWeekMonday)}` : '',
+          periodsHint.length ? `识别到 ${periodsHint.length} 个节次时间` : ''
+        ].filter(Boolean);
+        result.innerHTML = `<div class="result-good"><strong>课表可以使用</strong><p>${data.meetings.length} 个上课安排 · ${courses.size} 门不同课程${maxWeek ? ` · 最大周次 ${maxWeek}` : ''}</p>${conflicts.length ? `<p><b>⚠ 发现 ${conflicts.length} 组时间冲突</b>，请在下载前核对。第一组：${esc(conflicts[0].a.course)} ↔ ${esc(conflicts[0].b.course)}（${conflicts[0].weeks.join('、')}周）</p>` : '<p>未发现课程时间冲突。</p>'}${hints.length ? `<p>${hints.join(' · ')}。可在“学期与作息”维护页核对。</p>` : ''}<div class="result-actions"><button id="downloadBtn" class="import-primary" type="button">下载 schedule.json</button><button id="localBtn" class="import-secondary" type="button">仅在本机预览</button></div><small>确认无误后，用下载文件替换 GitHub 仓库里的 <code>data/schedule.json</code>。</small></div>`;
         document.getElementById('downloadBtn').onclick = download;
         document.getElementById('localBtn').onclick = localPreview;
       } catch (e) {

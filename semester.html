@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="theme-color" content="#f4f6fb" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>学期与作息</title>
+</head>
+<body>
+<main class="app-shell import-shell">
+  <header class="topbar">
+    <div class="topbar-copy"><div class="eyebrow">仅供维护</div><h1>学期与作息</h1></div>
+    <a class="today-button import-close" href="./admin.html" aria-label="返回维护页">×</a>
+  </header>
+
+  <section class="import-card">
+    <span class="import-step">1</span>
+    <div><h2>每学期只需要确认一次</h2><p>设置第一周周一、总周数和节次时间。课程本身仍通过正方 / WakeUp 导入，不需要在这里逐门填写。</p></div>
+  </section>
+
+  <section class="import-panel manage-form">
+    <label>学期名称<input id="label" type="text" /></label>
+    <label>学期 ID<input id="semesterId" type="text" /></label>
+    <div class="two-col">
+      <label>第一周周一<input id="firstWeek" type="date" /></label>
+      <label>总周数<input id="weekCount" type="number" min="1" max="30" /></label>
+    </div>
+    <label>时区<input id="timezone" type="text" value="Asia/Shanghai" /></label>
+  </section>
+
+  <section class="import-card">
+    <span class="import-step">2</span>
+    <div><h2>节次时间</h2><p>留空的时间会在课表里退化为“第 X 节”显示，不会猜测。</p></div>
+  </section>
+  <section class="import-panel" id="periodEditor"></section>
+
+  <button id="download" class="import-primary manage-download" type="button">下载 semester.json</button>
+  <p id="status" style="padding:10px 3px 0;color:var(--muted);font-size:10px;line-height:1.55"></p>
+</main>
+<script type="module">
+import {addDaysISO} from './core.js';
+const $=id=>document.getElementById(id);
+let original;
+boot();
+async function boot(){
+  original=await fetch('./data/semester.json',{cache:'no-store'}).then(r=>r.json());
+  const sem=original.semester||{};
+  $('label').value=sem.label||'';
+  $('semesterId').value=sem.id||'';
+  $('firstWeek').value=sem.firstWeekMonday||'';
+  $('weekCount').value=sem.weekCount||18;
+  $('timezone').value=sem.timezone||'Asia/Shanghai';
+  const periods=(original.periods||[]).length?original.periods:Array.from({length:10},(_,i)=>({index:i+1,start:null,end:null}));
+  $('periodEditor').innerHTML=periods.map(p=>`<div class="period-row" data-index="${p.index}"><strong>第 ${p.index} 节</strong><input class="p-start" type="time" value="${p.start||''}" aria-label="第${p.index}节开始"><span>—</span><input class="p-end" type="time" value="${p.end||''}" aria-label="第${p.index}节结束"></div>`).join('');
+  if((original.timeProfiles||[]).length>1) $('status').textContent='当前文件含多个作息 profile。本页会保留这些 profile 不变；如需修改多套夏/冬季作息，建议先保留原文件并单独核对。';
+}
+$('download').onclick=()=>{
+  const firstWeek=$('firstWeek').value, weekCount=Number($('weekCount').value);
+  if(!firstWeek||!weekCount) return alert('请填写第一周周一和总周数');
+  const periods=[...document.querySelectorAll('.period-row')].map(row=>({
+    index:Number(row.dataset.index),
+    start:row.querySelector('.p-start').value||null,
+    end:row.querySelector('.p-end').value||null,
+    verified:Boolean(row.querySelector('.p-start').value&&row.querySelector('.p-end').value)
+  }));
+  const out=structuredClone(original);
+  out.schemaVersion=Math.max(3,Number(out.schemaVersion||0));
+  out.semester={id:$('semesterId').value.trim(),label:$('label').value.trim(),firstWeekMonday:firstWeek,weekCount,timezone:$('timezone').value.trim()||'Asia/Shanghai'};
+  out.periods=periods;
+  const profiles=out.timeProfiles||[];
+  if(profiles.length<=1){
+    out.timeProfiles=[{
+      id:profiles[0]?.id||'default',
+      label:profiles[0]?.label||'默认作息',
+      effectiveFrom:firstWeek,
+      effectiveTo:addDaysISO(firstWeek,weekCount*7-1),
+      periods
+    }];
+  }
+  const blob=new Blob([JSON.stringify(out,null,2)+'\n'],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='semester.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  $('status').textContent='已生成 semester.json。确认后替换 GitHub 的 data/semester.json。';
+};
+</script>
+</body>
+</html>
